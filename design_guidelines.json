@@ -1,0 +1,130 @@
+{
+  "app_name": "Dash Cam Pro",
+  "personality": "5 Brutalist Mobile (adapted for high-contrast, flat Revolut-style UI)",
+  "personality_one_liner": "Stark, high-contrast, flat, and highly functional utilitarian interface that strips away noise for maximum driving safety and clarity.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#1A1A1A",
+    "surfaceSecondary": "#F5F5F5",
+    "onSurfaceSecondary": "#1A1A1A",
+    "surfaceTertiary": "#EBEBEB",
+    "onSurfaceTertiary": "#1A1A1A",
+    "surfaceInverse": "#1A1A1A",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#1A1A1A",
+    "brandPrimary": "#1A1A1A",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#F5F5F5",
+    "onBrandSecondary": "#1A1A1A",
+    "brandTertiary": "#EBEBEB",
+    "onBrandTertiary": "#1A1A1A",
+    "success": "#198754",
+    "onSuccess": "#FFFFFF",
+    "warning": "#FF9500",
+    "onWarning": "#1A1A1A",
+    "error": "#FF3B30",
+    "onError": "#FFFFFF",
+    "info": "#1A1A1A",
+    "onInfo": "#FFFFFF",
+    "border": "#EBEBEB",
+    "borderStrong": "#1A1A1A",
+    "divider": "#EBEBEB",
+    "muted": "#737373"
+  },
+  "typography": {
+    "displayFontFamily": "Geist",
+    "textFontFamily": "Geist",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Use 4px structural increments (Revolut style). Sharp, deliberate padding. No unnecessary negative space.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 4,
+    "md": 8,
+    "lg": 16,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "false",
+    "do's": [],
+    "dont's": [
+      "Do not use blur or glass. Everything must be flat and high contrast to ensure readability while driving."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Live Recording (Home)",
+      "purpose": "Main dash cam view with real-time video feed, speed HUD, and critical overlays.",
+      "states": {
+        "loading": "Dark placeholder surface with centered loading spinner.",
+        "empty": "N/A",
+        "error": "Display 'Camera unavailable' flat error banner over the dark feed."
+      },
+      "layout": "Full-bleed dark surface representing the camera feed. Floating flat overlays: Top-left has a pill-shaped REC indicator (pulsing Signal Red) and elapsed time. Top-right has camera flip action. Bottom-center has a large, high-contrast Speed HUD (using Mono font if possible) with a toggleable unit pill (km/h | mph) below it. During an impact, a high-contrast Signal Red banner drops from the top."
+    },
+    {
+      "name": "History",
+      "purpose": "List of all saved driving clips with quick indicators for impacts and speed.",
+      "states": {
+        "loading": "Flat skeleton rows.",
+        "empty": "Abstract geometric vector illustration with 'No trips recorded yet'.",
+        "error": "Flat error message with 'Retry' CTA."
+      },
+      "layout": "Flat, flush list rows (no floating cards). Each row shows a stark thumbnail placeholder (dark grey), timestamp, duration, max speed, and a high-visibility Signal Red icon if the clip was flagged for impact. Simple 1px divider between rows."
+    },
+    {
+      "name": "Settings",
+      "purpose": "Configuration for dash cam operation and UI preferences.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Classic grouped list layout. Flat sections for 'Preferences' (Speed Units, Theme Light/Dark), 'Safety' (Impact Sensitivity), and 'Storage' (Progress bar showing used space). No shadows, just crisp borders and solid background blocks."
+    }
+  ],
+  "images": {
+    "empty_state_geometry": {
+      "url": "https://images.unsplash.com/photo-1605106702842-01a887a31122?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG1pbmltYWwlMjBnZW9tZXRyaWMlMjBzaGFwZXMlMjBmbGF0fGVufDB8fHx8MTc5MDMyNzM1NXww&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.pexels.com/photos/19553078/pexels-photo-19553078.jpeg",
+      "alt": "Abstract minimal geometric pattern"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to a high-contrast, flat UI style (like Revolut). DO NOT USE SHADOWS or glassmorphism. Everything should be solid colors, crisp 1px borders, and flat surfaces.",
+    "Implement both Light and Dark mode using Expo's Appearance/useColorScheme. In Dark mode, invert surface to #000000, surfaceSecondary to #141414, and brandPrimary to #FFFFFF. This is a critical requirement from the user.",
+    "For the Speed HUD and timestamps on the Live Recording screen, use a Monospace font (like Space Mono or JetBrains Mono, or simply a tabular numbers variant if using standard font) for a technical, precise telemetry look.",
+    "The Impact Detection should trigger a highly visible, flat Signal Red (#FF3B30) banner or overlay, accompanied by haptic feedback (Impact/Heavy) and a local notification.",
+    "Use Phosphor icons. Ensure all icons are either universally filled or outlined per screen. The bottom tab bar can use outline-inactive/filled-active.",
+    "All imagery must be abstract or flat UI elements. Avoid using real-life stock photos as requested by the user."
+  ]
+}
