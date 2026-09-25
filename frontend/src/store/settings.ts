@@ -8,12 +8,21 @@ export type ThemePreference = "system" | "light" | "dark";
 export type ImpactSensitivity = "low" | "medium" | "high";
 export type SegmentLength = 1 | 3 | 5;
 
-// Threshold, in g above resting gravity, at which a reading counts as an impact.
-export const SENSITIVITY_THRESHOLD_G: Record<ImpactSensitivity, number> = {
+// Thresholds, in g above resting gravity, at which a reading counts as an impact.
+// Parked: small bumps matter (someone hitting the car). Driving: road noise, potholes and
+// braking must not trigger, so a much higher force is required to count as a crash.
+export const PARKED_THRESHOLD_G: Record<ImpactSensitivity, number> = {
   low: 3.0,
   medium: 2.2,
   high: 1.5,
 };
+export const DRIVING_THRESHOLD_G: Record<ImpactSensitivity, number> = {
+  low: 5.5,
+  medium: 4.5,
+  high: 3.5,
+};
+/** Above this speed the car counts as driving for impact detection. */
+export const DRIVING_SPEED_KMH = 8;
 
 type SettingsState = {
   deviceId: string;

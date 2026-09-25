@@ -1,14 +1,17 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { ArrowLeft, LockSimple, LockSimpleOpen, Trash, Warning } from "phosphor-react-native";
+import { ArrowLeft, DownloadSimple, LockSimple, LockSimpleOpen, ShareNetwork, Trash, Warning } from "phosphor-react-native";
 import React, { useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClipThumb } from "@/src/components/history/ClipRow";
+import { RouteMap } from "@/src/components/map/RouteMap";
 import { Button } from "@/src/components/ui/Button";
+import { Toast, useToast } from "@/src/components/ui/Toast";
 import { formatBytes, formatClock, formatDuration, formatFullDate, formatSpeed, unitLabel } from "@/src/lib/format";
 import { deleteClipEvent } from "@/src/services/api";
+import { exportMessage, saveClipToPhotos, shareClip } from "@/src/services/export";
 import { deleteClipFile } from "@/src/services/files";
 import { useClips } from "@/src/store/clips";
 import { useSettings } from "@/src/store/settings";
@@ -26,6 +29,23 @@ export default function ClipDetailScreen() {
   const unit = useSettings((s) => s.speedUnit);
   const deviceId = useSettings((s) => s.deviceId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exporting, setExporting] = useState<"save" | "share" | null>(null);
+  const toast = useToast();
+
+  const onSave = async () => {
+    setExporting("save");
+    const res = await saveClipToPhotos(clip?.uri ?? null);
+    setExporting(null);
+    const msg = exportMessage(res);
+    if (msg) toast.show(msg);
+  };
+  const onShare = async () => {
+    setExporting("share");
+    const res = await shareClip(clip?.uri ?? null);
+    setExporting(null);
+    const msg = exportMessage(res);
+    if (msg) toast.show(msg);
+  };
 
   const player = useVideoPlayer(clip?.uri ?? null, (p) => {
     p.loop = true;
@@ -51,6 +71,7 @@ export default function ClipDetailScreen() {
         { label: "Max speed", value: `${formatSpeed(clip.maxSpeedKmh, unit)} ${unitLabel(unit)}` },
         { label: "Avg speed", value: `${formatSpeed(clip.avgSpeedKmh, unit)} ${unitLabel(unit)}` },
         { label: "Impact force", value: clip.gForce ? `${clip.gForce.toFixed(2)} g` : "—" },
+        ...(clip.impactMode ? [{ label: "Detected while", value: clip.impactMode === "driving" ? "Driving" : "Parked" }] : []),
         { label: "Camera", value: clip.camera === "back" ? "Rear" : "Front" },
         { label: "File size", value: clip.uri ? formatBytes(clip.sizeBytes) : "No video" },
         ...(clip.latitude !== undefined && clip.longitude !== undefined
@@ -103,6 +124,55 @@ export default function ClipDetailScreen() {
             </View>
           ) : null}
 
+          <View style={styles.exportRow}>
+            <Button
+              testID="clip-download"
+              label="Download"
+              variant="primary"
+              icon={<DownloadSimple size={18} color={colors.onBrandPrimary} />}
+              onPress={onSave}
+              loading={exporting === "save"}
+              disabled={!clip.uri}
+              style={styles.exportBtn}
+            />
+            <Button
+              testID="clip-share"
+              label="Share"
+              variant="secondary"
+              icon={<ShareNetwork size={18} color={colors.onSurfaceSecondary} />}
+              onPress={onShare}
+              loading={exporting === "share"}
+              disabled={!clip.uri}
+              style={styles.exportBtn}
+            />
+          </View>
+
+          <Text style={styles.sectionTitle}>Route</Text>
+          {clip.track && clip.track.length > 0 ? (
+            <RouteMap track={clip.track} impactPoint={clip.impactPoint} height={240} />
+          ) : (
+            <View style={styles.noRoute} testID="no-route">
+              <Text style={styles.noRouteText}>No GPS route was recorded for this clip.</Text>
+            </View>
+          )}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={styles.legendStart} />
+              <Text style={styles.legendText}>Start</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={styles.legendEnd} />
+              <Text style={styles.legendText}>End</Text>
+            </View>
+            {clip.impactPoint ? (
+              <View style={styles.legendItem}>
+                <View style={styles.legendImpact} />
+                <Text style={styles.legendText}>Impact</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text style={styles.sectionTitle}>Details</Text>
           <View style={styles.facts}>
             {facts.map((f, i) => (
               <View key={f.label} style={[styles.fact, i === facts.length - 1 && { borderBottomWidth: 0 }]}>
@@ -124,6 +194,7 @@ export default function ClipDetailScreen() {
           </View>
         </ScrollView>
       )}
+      <Toast message={toast.message} bottom={insets.bottom + 24} />
     </View>
   );
 }
@@ -155,5 +226,24 @@ const useStyles = makeStyles((colors) => ({
   actions: { padding: spacing.lg, gap: spacing.sm },
   missing: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.lg, padding: spacing.xl },
   missingText: { fontFamily: fonts.medium, fontSize: 16, color: colors.muted },
-  thumbWrap: { borderRadius: radius.md },
+  exportRow: { flexDirection: "row", gap: spacing.sm, padding: spacing.lg },
+  exportBtn: { flex: 1 },
+  sectionTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: colors.muted,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  noRoute: { height: 120, marginHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  noRouteText: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
+  legend: { flexDirection: "row", gap: spacing.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.onSurface },
+  legendEnd: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: colors.onSurface },
+  legendImpact: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.error },
+  legendText: { fontFamily: fonts.regular, fontSize: 12, color: colors.muted },
 }));

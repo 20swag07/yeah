@@ -13,7 +13,7 @@ import { deleteAllEvents } from "@/src/services/api";
 import { deleteClipFile, getDiskInfo } from "@/src/services/files";
 import { getNotificationPermission, registerForPush, type NotifPermission } from "@/src/services/notifications";
 import { useClips } from "@/src/store/clips";
-import { SENSITIVITY_THRESHOLD_G, useSettings, type ImpactSensitivity, type SegmentLength, type ThemePreference } from "@/src/store/settings";
+import { DRIVING_THRESHOLD_G, PARKED_THRESHOLD_G, useSettings, type ImpactSensitivity, type SegmentLength, type ThemePreference } from "@/src/store/settings";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 export default function SettingsScreen() {
@@ -121,7 +121,7 @@ export default function SettingsScreen() {
       <Group>
         <SettingsRow
           title="Impact sensitivity"
-          subtitle={`Triggers above ${SENSITIVITY_THRESHOLD_G[s.impactSensitivity].toFixed(1)}g. Higher sensitivity flags smaller bumps.`}
+          subtitle={`Parked: above ${PARKED_THRESHOLD_G[s.impactSensitivity].toFixed(1)}g · Driving: above ${DRIVING_THRESHOLD_G[s.impactSensitivity].toFixed(1)}g. Small bumps count while parked; on the road only a crash-level force triggers.`}
           icon={<Warning size={22} color={colors.onSurface} />}
           testID="setting-sensitivity"
         >

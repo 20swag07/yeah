@@ -2,6 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+export type TrackPoint = { lat: number; lng: number; t: number; kmh: number };
+export type GeoPoint = { lat: number; lng: number };
+export type ImpactMode = "parked" | "driving";
+
 export type Clip = {
   id: string;
   /** Local file URI. Null when the event was captured without video (e.g. web preview). */
@@ -16,6 +20,11 @@ export type Clip = {
   camera: "back" | "front";
   latitude?: number;
   longitude?: number;
+  /** GPS route sampled during the segment, start → end. */
+  track?: TrackPoint[];
+  /** Where the impact happened, if this clip was impact-flagged and GPS was available. */
+  impactPoint?: GeoPoint;
+  impactMode?: ImpactMode;
   /** Protected clips are never removed by automatic storage cleanup. */
   locked: boolean;
 };

@@ -9,11 +9,14 @@ import { formatSpeed, unitLabel, type SpeedUnit } from "@/src/lib/format";
 import { syncClipEvent } from "@/src/services/api";
 import { deleteClipFile, getDiskInfo, persistRecording } from "@/src/services/files";
 import { sendImpactLocalNotification } from "@/src/services/notifications";
-import { makeClipId, useClips, type Clip } from "@/src/store/clips";
+import { makeClipId, useClips, type Clip, type GeoPoint, type ImpactMode, type TrackPoint } from "@/src/store/clips";
 
 export type RecorderStatus = "idle" | "starting" | "recording" | "saving" | "error";
 
 const MIN_FREE_BYTES = 500 * 1024 * 1024;
+const MAX_TRACK_POINTS = 900;
+
+type PendingImpact = { gForce: number; mode: ImpactMode; point?: GeoPoint };
 
 type Options = {
   cameraRef: React.RefObject<CameraView | null>;
@@ -39,23 +42,40 @@ export function useRecorder(opts: Options) {
   const stopResolvers = useRef<(() => void)[]>([]);
   const cameraReadyRef = useRef(cameraReady);
   cameraReadyRef.current = cameraReady;
-  const pendingImpact = useRef<number | null>(null);
+  const pendingImpact = useRef<PendingImpact | null>(null);
   const segmentStart = useRef(0);
+  const tripStart = useRef(0);
+  const [holdingTrip, setHoldingTrip] = useState(false);
   const speeds = useRef<number[]>([]);
+  const track = useRef<TrackPoint[]>([]);
   const addClip = useClips((s) => s.addClip);
 
   const canRecordVideo = Platform.OS !== "web";
 
-  // Elapsed timer + speed sampling while recording
+  // Trip timer (keeps counting across segments and camera flips) + speed/route sampling.
   useEffect(() => {
-    if (status !== "recording") return;
+    const running = status !== "idle" && status !== "error";
+    if (!running && !holdingTrip) return;
     const t = setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - segmentStart.current) / 1000));
+      if (tripStart.current) setElapsedSec(Math.floor((Date.now() - tripStart.current) / 1000));
+      if (status !== "recording") return;
       const s = lastSample.current;
-      if (s) speeds.current.push(s.kmh);
+      if (!s) return;
+      speeds.current.push(s.kmh);
+      const pts = track.current;
+      const last = pts[pts.length - 1];
+      const moved = !last || Math.abs(last.lat - s.latitude) > 0.00002 || Math.abs(last.lng - s.longitude) > 0.00002;
+      if (moved && pts.length < MAX_TRACK_POINTS) {
+        pts.push({
+          lat: s.latitude,
+          lng: s.longitude,
+          t: Math.round((Date.now() - segmentStart.current) / 1000),
+          kmh: Math.round(s.kmh),
+        });
+      }
     }, 1000);
     return () => clearInterval(t);
-  }, [status, lastSample]);
+  }, [status, holdingTrip, lastSample]);
 
   const freeUpSpaceIfNeeded = useCallback(() => {
     const { available, total } = getDiskInfo();
@@ -69,8 +89,9 @@ export function useRecorder(opts: Options) {
   }, []);
 
   const finalizeClip = useCallback(
-    async (tempUri: string | null, impactG: number | null) => {
+    async (tempUri: string | null, impact: PendingImpact | null) => {
       const id = makeClipId();
+      const impactG = impact ? impact.gForce : null;
       const durationSec = Math.max(1, Math.round((Date.now() - segmentStart.current) / 1000));
       const samples = speeds.current;
       const maxSpeedKmh = samples.length ? Math.max(...samples) : lastSample.current?.kmh ?? 0;
@@ -95,6 +116,9 @@ export function useRecorder(opts: Options) {
         camera: facing,
         latitude: lastSample.current?.latitude,
         longitude: lastSample.current?.longitude,
+        track: track.current.length ? [...track.current] : undefined,
+        impactPoint: impact?.point,
+        impactMode: impact?.mode,
         locked: impactG !== null,
       };
       addClip(clip);
@@ -153,7 +177,7 @@ export function useRecorder(opts: Options) {
         }
         segmentStart.current = Date.now();
         speeds.current = [];
-        setElapsedSec(0);
+        track.current = [];
         setStatus("recording");
         let result: { uri: string } | undefined;
         try {
@@ -176,11 +200,11 @@ export function useRecorder(opts: Options) {
         if (gen.current !== myGen) return;
         failures = 0;
         setError(null);
-        const impactG = pendingImpact.current;
+        const impact = pendingImpact.current;
         pendingImpact.current = null;
-        if (result?.uri || impactG !== null) {
+        if (result?.uri || impact) {
           setStatus("saving");
-          await finalizeClip(result?.uri ?? null, impactG);
+          await finalizeClip(result?.uri ?? null, impact);
         }
       }
       if (gen.current === myGen) setStatus("idle");
@@ -194,22 +218,35 @@ export function useRecorder(opts: Options) {
     setError(null);
     activeRef.current = true;
     const myGen = ++gen.current;
+    if (!holdingTrip) {
+      tripStart.current = Date.now();
+      setElapsedSec(0);
+    }
+    setHoldingTrip(false);
     if (!canRecordVideo) {
       // Web preview: no video capture, but the HUD, timer and impact flow still run.
       segmentStart.current = Date.now();
       speeds.current = [];
-      setElapsedSec(0);
+      track.current = [];
       setStatus("recording");
       return;
     }
     setStatus("starting");
     loop(myGen);
-  }, [canRecordVideo, loop]);
+  }, [canRecordVideo, holdingTrip, loop]);
 
-  /** Stops recording. Resolves once the current segment has been saved and the loop has exited. */
-  const stop = useCallback((): Promise<void> => {
+  /**
+   * Stops recording. Resolves once the current segment has been saved and the loop has exited.
+   * `keepTrip` keeps the trip timer running (used while switching cameras, so the trip continues).
+   */
+  const stop = useCallback((opts?: { keepTrip?: boolean }): Promise<void> => {
     if (!activeRef.current) return Promise.resolve();
     activeRef.current = false;
+    if (opts?.keepTrip) setHoldingTrip(true);
+    else {
+      setHoldingTrip(false);
+      tripStart.current = 0;
+    }
     if (!canRecordVideo) {
       setStatus("idle");
       return Promise.resolve();
@@ -221,23 +258,25 @@ export function useRecorder(opts: Options) {
 
   /** Marks the running segment as an impact clip, saves it immediately and restarts recording. */
   const triggerImpact = useCallback(
-    async (gForce: number) => {
+    async (gForce: number, mode: ImpactMode = "parked") => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      const s = lastSample.current;
+      const impact: PendingImpact = { gForce, mode, point: s ? { lat: s.latitude, lng: s.longitude } : undefined };
       if (canRecordVideo && status === "recording" && activeRef.current) {
-        pendingImpact.current = gForce;
+        pendingImpact.current = impact;
         cameraRef.current?.stopRecording();
         return;
       }
       // No live video (web / not recording): save a metadata-only event.
       if (!segmentStart.current) segmentStart.current = Date.now();
-      await finalizeClip(null, gForce);
+      await finalizeClip(null, impact);
       if (!canRecordVideo && activeRef.current) {
         segmentStart.current = Date.now();
         speeds.current = [];
-        setElapsedSec(0);
+        track.current = [];
       }
     },
-    [cameraRef, canRecordVideo, finalizeClip, status],
+    [cameraRef, canRecordVideo, finalizeClip, lastSample, status],
   );
 
   /** Ends the running segment early (unflagged) and continues with a fresh one. */
@@ -250,7 +289,7 @@ export function useRecorder(opts: Options) {
     await finalizeClip(null, null);
     segmentStart.current = Date.now();
     speeds.current = [];
-    setElapsedSec(0);
+    track.current = [];
   }, [cameraRef, canRecordVideo, finalizeClip, status]);
 
   useEffect(() => {

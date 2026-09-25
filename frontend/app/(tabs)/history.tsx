@@ -4,10 +4,12 @@ import { SectionList, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClipRow } from "@/src/components/history/ClipRow";
+import { Toast, useToast } from "@/src/components/ui/Toast";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { ScreenHeader } from "@/src/components/ui/ScreenHeader";
 import { SegmentedControl } from "@/src/components/ui/SegmentedControl";
 import { formatBytes, formatDayLabel } from "@/src/lib/format";
+import { exportMessage, saveClipToPhotos } from "@/src/services/export";
 import { useClips, type Clip } from "@/src/store/clips";
 import { useSettings } from "@/src/store/settings";
 import { fonts, makeStyles, spacing } from "@/src/theme";
@@ -21,6 +23,13 @@ export default function HistoryScreen() {
   const clips = useClips((s) => s.clips);
   const unit = useSettings((s) => s.speedUnit);
   const [filter, setFilter] = useState<Filter>("all");
+  const toast = useToast();
+
+  const download = async (clip: Clip) => {
+    toast.show("Saving to Photos…");
+    const msg = exportMessage(await saveClipToPhotos(clip.uri));
+    if (msg) toast.show(msg);
+  };
 
   const impactCount = useMemo(() => clips.filter((c) => c.impact).length, [clips]);
   const totalBytes = useMemo(() => clips.reduce((a, c) => a + (c.sizeBytes || 0), 0), [clips]);
@@ -59,7 +68,13 @@ export default function HistoryScreen() {
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.listContent}
         renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
         renderItem={({ item, index, section }) => (
-          <ClipRow clip={item} unit={unit} last={index === section.data.length - 1} onPress={() => router.push(`/clip/${item.id}`)} />
+          <ClipRow
+            clip={item}
+            unit={unit}
+            last={index === section.data.length - 1}
+            onPress={() => router.push(`/clip/${item.id}`)}
+            onDownload={() => download(item)}
+          />
         )}
         ListEmptyComponent={
           <EmptyState
@@ -72,6 +87,7 @@ export default function HistoryScreen() {
           />
         }
       />
+      <Toast message={toast.message} bottom={24} />
     </View>
   );
 }

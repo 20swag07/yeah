@@ -41,7 +41,7 @@ import {
   registerForPush,
   type NotifPermission,
 } from "@/src/services/notifications";
-import { useClips } from "@/src/store/clips";
+import { useClips, type ImpactMode } from "@/src/store/clips";
 import { useSettings } from "@/src/store/settings";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
@@ -90,16 +90,13 @@ export default function RecordScreen() {
   });
 
   const handleImpact = useCallback(
-    (g: number) => {
-      recorder.triggerImpact(g);
+    (g: number, mode: ImpactMode) => {
+      recorder.triggerImpact(g, mode);
     },
     [recorder],
   );
-  const impact = useImpactDetection(
-    recorder.status === "recording",
-    impactSensitivity,
-    handleImpact,
-  );
+  const getSpeed = useCallback(() => speed.lastSample.current?.kmh ?? speed.speedKmh, [speed.lastSample, speed.speedKmh]);
+  const impact = useImpactDetection(recorder.status === "recording", impactSensitivity, getSpeed, handleImpact);
 
   // Show the banner whenever a new impact clip lands; auto-hide after 7s.
   useEffect(() => {
@@ -149,7 +146,7 @@ export default function RecordScreen() {
     const wasActive = recording;
     // Finish + save the running segment before the camera remounts, so no footage is lost.
     await Promise.race([
-      recorder.stop(),
+      recorder.stop({ keepTrip: true }),
       new Promise<void>((r) => setTimeout(r, 3000)),
     ]);
     resumeAfterReady.current = wasActive;
@@ -206,8 +203,15 @@ export default function RecordScreen() {
         style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}
         pointerEvents="box-none"
       >
-        <RecPill status={recorder.status} elapsedSec={recorder.elapsedSec} />
+        <RecPill status={flipping ? "recording" : recorder.status} elapsedSec={recorder.elapsedSec} />
         <View style={styles.topActions}>
+          {recording || flipping ? (
+            <View style={styles.gPill} testID="impact-mode">
+              <Text style={styles.gText}>
+                {impact.mode === "driving" ? "DRIVING" : "PARKED"} · ≥{impact.threshold.toFixed(1)}g
+              </Text>
+            </View>
+          ) : null}
           {impact.available ? (
             <View style={styles.gPill} testID="g-meter">
               <Text style={styles.gText}>G {impact.currentG.toFixed(2)}</Text>
@@ -336,7 +340,7 @@ export default function RecordScreen() {
             <Pressable
               testID="mark-event"
               accessibilityRole="button"
-              onPress={() => recorder.triggerImpact(0)}
+              onPress={() => recorder.triggerImpact(0, impact.mode)}
               disabled={!recording}
               style={[styles.sideBtn, !recording && styles.disabled]}
             >

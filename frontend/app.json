@@ -14,7 +14,8 @@
         "NSCameraUsageDescription": "Record the road ahead while you drive",
         "NSMicrophoneUsageDescription": "Capture audio with your dash cam footage",
         "NSLocationWhenInUseUsageDescription": "Show your live speed and stamp it on clips",
-        "NSMotionUsageDescription": "Detect impacts and save the clip automatically"
+        "NSMotionUsageDescription": "Detect impacts and save the clip automatically",
+        "NSPhotoLibraryAddUsageDescription": "Download dash cam clips to your Photos"
       }
     },
     "android": {
@@ -82,7 +83,15 @@
           "color": "#FF3B30"
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Download dash cam clips to your Photos",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,4 +1,4 @@
-import { LockSimple, Warning } from "phosphor-react-native";
+import { DownloadSimple, LockSimple, Warning } from "phosphor-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Line, Path, Rect } from "react-native-svg";
@@ -26,9 +26,9 @@ export function ClipThumb({ impact, size = 72, hasVideo = true }: { impact: bool
   );
 }
 
-type Props = { clip: Clip; unit: SpeedUnit; onPress: () => void; last?: boolean };
+type Props = { clip: Clip; unit: SpeedUnit; onPress: () => void; onDownload?: () => void; last?: boolean };
 
-export function ClipRow({ clip, unit, onPress, last }: Props) {
+export function ClipRow({ clip, unit, onPress, onDownload, last }: Props) {
   const styles = useStyles();
   const { colors } = useTheme();
   return (
@@ -56,6 +56,19 @@ export function ClipRow({ clip, unit, onPress, last }: Props) {
         </Text>
       </View>
       <Text style={styles.speed}>{formatSpeed(clip.maxSpeedKmh, unit)}</Text>
+      {onDownload ? (
+        <Pressable
+          testID={`clip-download-${clip.id}`}
+          accessibilityRole="button"
+          accessibilityLabel="Download clip"
+          onPress={onDownload}
+          disabled={!clip.uri}
+          hitSlop={6}
+          style={({ pressed }) => [styles.download, !clip.uri && styles.downloadDisabled, pressed && { opacity: 0.5 }]}
+        >
+          <DownloadSimple size={20} color={colors.onSurface} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -87,4 +100,6 @@ const useStyles = makeStyles((colors) => ({
   },
   impactText: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 0.8, color: colors.onError },
   speed: { fontFamily: fonts.mono, fontSize: 20, color: colors.onSurface, minWidth: 40, textAlign: "right" },
+  download: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  downloadDisabled: { opacity: 0.3 },
 }));
