@@ -35,6 +35,10 @@ export function useRecorder(opts: Options) {
   const [lastImpact, setLastImpact] = useState<{ clipId: string; gForce: number; at: number } | null>(null);
 
   const activeRef = useRef(false);
+  const gen = useRef(0);
+  const stopResolvers = useRef<(() => void)[]>([]);
+  const cameraReadyRef = useRef(cameraReady);
+  cameraReadyRef.current = cameraReady;
   const pendingImpact = useRef<number | null>(null);
   const segmentStart = useRef(0);
   const speeds = useRef<number[]>([]);
@@ -108,36 +112,88 @@ export function useRecorder(opts: Options) {
     [addClip, deviceId, facing, freeUpSpaceIfNeeded, lastSample, notificationsEnabled, speedUnit],
   );
 
-  const loop = useCallback(async () => {
-    while (activeRef.current) {
-      const cam = cameraRef.current;
-      if (!cam) break;
-      segmentStart.current = Date.now();
-      speeds.current = [];
-      setElapsedSec(0);
-      setStatus("recording");
-      try {
-        const result = await cam.recordAsync({ maxDuration: segmentMinutes * 60 });
-        if (!activeRef.current && !result?.uri) break;
-        setStatus("saving");
-        const impactG = pendingImpact.current;
-        pendingImpact.current = null;
-        await finalizeClip(result?.uri ?? null, impactG);
-      } catch (e: any) {
-        console.warn("[recorder] segment failed", e);
-        setError(e?.message ?? "Recording failed");
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  const finishStop = useCallback(() => {
+    const resolvers = stopResolvers.current;
+    stopResolvers.current = [];
+    resolvers.forEach((r) => r());
+  }, []);
+
+  /** Waits (bounded) until the camera view reports ready. Returns false if superseded/stopped. */
+  const waitForCamera = useCallback(
+    async (myGen: number) => {
+      for (let i = 0; i < 100; i++) {
+        if (!activeRef.current || gen.current !== myGen) return false;
+        if (cameraReadyRef.current && cameraRef.current) return true;
+        await sleep(100);
+      }
+      return !!(cameraReadyRef.current && cameraRef.current);
+    },
+    [cameraRef],
+  );
+
+  const loop = useCallback(
+    async (myGen: number) => {
+      let failures = 0;
+      const ready = await waitForCamera(myGen);
+      if (gen.current !== myGen) return;
+      if (!ready) {
+        setError("Camera is not ready. Try again.");
         setStatus("error");
         activeRef.current = false;
+        finishStop();
         return;
       }
-    }
-    setStatus("idle");
-  }, [cameraRef, finalizeClip, segmentMinutes]);
+      while (activeRef.current && gen.current === myGen) {
+        const cam = cameraRef.current;
+        if (!cam) {
+          await sleep(200);
+          continue;
+        }
+        segmentStart.current = Date.now();
+        speeds.current = [];
+        setElapsedSec(0);
+        setStatus("recording");
+        let result: { uri: string } | undefined;
+        try {
+          result = await cam.recordAsync({ maxDuration: segmentMinutes * 60 });
+        } catch (e: any) {
+          if (gen.current !== myGen) return;
+          console.warn("[recorder] segment failed", e);
+          if (!activeRef.current) break; // stopped mid-flight: exit quietly
+          failures += 1;
+          setError(e?.message ?? "Recording failed");
+          if (failures >= 4) {
+            setStatus("error");
+            activeRef.current = false;
+            finishStop();
+            return;
+          }
+          await sleep(700 * failures);
+          continue;
+        }
+        if (gen.current !== myGen) return;
+        failures = 0;
+        setError(null);
+        const impactG = pendingImpact.current;
+        pendingImpact.current = null;
+        if (result?.uri || impactG !== null) {
+          setStatus("saving");
+          await finalizeClip(result?.uri ?? null, impactG);
+        }
+      }
+      if (gen.current === myGen) setStatus("idle");
+      finishStop();
+    },
+    [cameraRef, finalizeClip, finishStop, segmentMinutes, waitForCamera],
+  );
 
   const start = useCallback(() => {
     if (activeRef.current) return;
     setError(null);
     activeRef.current = true;
+    const myGen = ++gen.current;
     if (!canRecordVideo) {
       // Web preview: no video capture, but the HUD, timer and impact flow still run.
       segmentStart.current = Date.now();
@@ -147,14 +203,20 @@ export function useRecorder(opts: Options) {
       return;
     }
     setStatus("starting");
-    loop();
+    loop(myGen);
   }, [canRecordVideo, loop]);
 
-  const stop = useCallback(() => {
-    if (!activeRef.current) return;
+  /** Stops recording. Resolves once the current segment has been saved and the loop has exited. */
+  const stop = useCallback((): Promise<void> => {
+    if (!activeRef.current) return Promise.resolve();
     activeRef.current = false;
-    if (canRecordVideo) cameraRef.current?.stopRecording();
-    else setStatus("idle");
+    if (!canRecordVideo) {
+      setStatus("idle");
+      return Promise.resolve();
+    }
+    const done = new Promise<void>((resolve) => stopResolvers.current.push(resolve));
+    cameraRef.current?.stopRecording();
+    return done;
   }, [cameraRef, canRecordVideo]);
 
   /** Marks the running segment as an impact clip, saves it immediately and restarts recording. */
@@ -191,17 +253,10 @@ export function useRecorder(opts: Options) {
     setElapsedSec(0);
   }, [cameraRef, canRecordVideo, finalizeClip, status]);
 
-  // Camera unmount / facing switch safety: stop the loop when the camera goes away.
-  useEffect(() => {
-    if (!cameraReady && activeRef.current && canRecordVideo) {
-      activeRef.current = false;
-      setStatus("idle");
-    }
-  }, [cameraReady, canRecordVideo]);
-
   useEffect(() => {
     return () => {
       activeRef.current = false;
+      gen.current += 1;
       if (Platform.OS !== "web") cameraRef.current?.stopRecording();
     };
   }, [cameraRef]);

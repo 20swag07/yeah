@@ -50,11 +50,13 @@ const useStyles = makeStyles((colors) => ({
   wrap: { alignItems: "center", gap: spacing.sm },
   speed: {
     fontFamily: fonts.mono,
-    fontSize: 88,
-    lineHeight: 92,
-    letterSpacing: -4,
+    fontSize: 84,
+    lineHeight: 104,
+    letterSpacing: -2,
     color: colors.onFeed,
     fontVariant: ["tabular-nums"],
+    includeFontPadding: false,
+    textAlign: "center",
   },
   units: {
     flexDirection: "row",

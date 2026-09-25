@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { Bell, CameraRotate, Clock, Gauge, HardDrive, Moon, Trash, Warning } from "phosphor-react-native";
+import { Bell, Clock, Gauge, HardDrive, Moon, Trash, Warning } from "phosphor-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -112,15 +112,8 @@ export default function SettingsScreen() {
           title="Auto-start recording"
           subtitle="Begin recording when the app opens"
           toggle={{ value: s.autoStart, onChange: s.setAutoStart }}
-          testID="setting-autostart"
-        />
-        <SettingsRow
-          title="Dual camera view"
-          subtitle="Front camera picture-in-picture. Requires the installed mobile app."
-          icon={<CameraRotate size={22} color={colors.onSurface} />}
-          toggle={{ value: s.dualCamera, onChange: s.setDualCamera }}
           last
-          testID="setting-dual"
+          testID="setting-autostart"
         />
       </Group>
 

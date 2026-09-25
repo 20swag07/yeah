@@ -13,7 +13,7 @@ Mobile dash cam app (Expo + FastAPI + MongoDB) with a modern, slim, flat Revolut
 - `frontend/app/_layout.tsx` — fonts (Geist + SpaceMono), theme sync, notification handler/channel, tap handlers, denied nudge, silent push re-registration.
 - `frontend/app/(tabs)/` — `index.tsx` (Record), `history.tsx`, `settings.tsx`; `app/clip/[id].tsx` — clip detail + expo-video playback.
 - `frontend/src/hooks/` — `useRecorder` (segment loop via expo-camera `recordAsync(maxDuration)`, impact-flagged save, storage cleanup), `useSpeed` (expo-location), `useImpactDetection` (expo-sensors Accelerometer, sensitivity thresholds).
-- `frontend/src/store/` — zustand persisted `settings` (unit, theme, sensitivity, clip length, dual cam, notifications, autoStart, deviceId) and `clips` (local metadata).
+- `frontend/src/store/` — zustand persisted `settings` (unit, theme, sensitivity, clip length, notifications, autoStart, deviceId) and `clips` (local metadata).
 - `frontend/src/services/` — `api.ts` (backend), `files.ts` (expo-file-system clips dir), `notifications.ts` (local + Emergent push registration).
 - `frontend/src/theme.ts` — light/dark tokens from design_guidelines.json + `feed*` tokens for camera chrome.
 - `backend/server.py` — `/api/register-push`, `/api/events` (POST triggers `send_push` on impact), `GET/DELETE /api/events`.
@@ -24,7 +24,7 @@ Mobile dash cam app (Expo + FastAPI + MongoDB) with a modern, slim, flat Revolut
 ## Status
 - [x] Design guidelines fetched, theme implemented (light + dark, in-app toggle)
 - [x] Record screen: camera feed, REC pill, speed HUD + unit toggle, controls (pause/start, save clip, mark event), G-meter, impact banner, permission gates (camera/mic/location/notifications per contract), web preview mode
-- [x] Dual camera PiP preview (native only; second camera preview-only)
+- [x] Dual camera: user chose one-tap front/back switch (flip button); PiP/second CameraView removed because iOS cannot run two capture sessions (CameraRecordingFailedException). Native multi-cam module deferred/declined.
 - [x] Impact detection + local notification + backend event → Emergent push
 - [x] History (day sections, All/Impacts filter, empty state), clip detail (video playback, facts, lock, delete)
 - [x] Settings (units, theme, clip length, autostart, dual cam, sensitivity, alerts, storage, delete all)
@@ -35,4 +35,5 @@ Mobile dash cam app (Expo + FastAPI + MongoDB) with a modern, slim, flat Revolut
 ## Notes / limitations
 - Video capture, accelerometer, push: need real device (Expo Go for camera/sensors; push needs a Publish build).
 - Web preview: HUD/flows run in "preview mode" — events saved without video.
-- Simultaneous dual *recording* is not supported by expo-camera; second camera is preview-only.
+- Simultaneous dual recording is not possible with expo-camera; would need a custom AVCaptureMultiCamSession module + published build (user declined for now).
+- Fixes (iteration 2): permission card was covered by bottom HUD (hidden while gate is up), speed digits clipped (lineHeight), record button dead after flip (CameraView keyed by facing, recorder waits for camera-ready, awaitable stop, retry loop with generation tokens).

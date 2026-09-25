@@ -21,7 +21,6 @@ type SettingsState = {
   theme: ThemePreference;
   impactSensitivity: ImpactSensitivity;
   segmentMinutes: SegmentLength;
-  dualCamera: boolean;
   notificationsEnabled: boolean;
   autoStart: boolean;
   hasSeenOnboarding: boolean;
@@ -29,7 +28,6 @@ type SettingsState = {
   setTheme: (t: ThemePreference) => void;
   setImpactSensitivity: (s: ImpactSensitivity) => void;
   setSegmentMinutes: (m: SegmentLength) => void;
-  setDualCamera: (v: boolean) => void;
   setNotificationsEnabled: (v: boolean) => void;
   setAutoStart: (v: boolean) => void;
   setHasSeenOnboarding: (v: boolean) => void;
@@ -48,7 +46,6 @@ export const useSettings = create<SettingsState>()(
       theme: "system",
       impactSensitivity: "medium",
       segmentMinutes: 3,
-      dualCamera: false,
       notificationsEnabled: true,
       autoStart: true,
       hasSeenOnboarding: false,
@@ -56,7 +53,6 @@ export const useSettings = create<SettingsState>()(
       setTheme: (theme) => set({ theme }),
       setImpactSensitivity: (impactSensitivity) => set({ impactSensitivity }),
       setSegmentMinutes: (segmentMinutes) => set({ segmentMinutes }),
-      setDualCamera: (dualCamera) => set({ dualCamera }),
       setNotificationsEnabled: (notificationsEnabled) => set({ notificationsEnabled }),
       setAutoStart: (autoStart) => set({ autoStart }),
       setHasSeenOnboarding: (hasSeenOnboarding) => set({ hasSeenOnboarding }),
